@@ -12,3 +12,6 @@ export MODULES="base(network,asl3)"
 export BASE_ARCH=aarch64
 export BASE_IMAGE_ENLARGEROOT=512
 export BASE_DISTRO=raspios64
+
+export BASE_USER=allstar
+export BASE_USER_PASSWORD=LinkTheWorld

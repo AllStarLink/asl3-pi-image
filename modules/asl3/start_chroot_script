@@ -51,3 +51,8 @@ ufw allow http
 ufw allow 4560:4580/udp comment 'IAX2 ports'
 ufw enable
 systemctl enable ufw
+
+# Create motd & issue
+unpack filesystem/etc/motd /etc/motd root
+echo "" > /etc/issue
+echo "" > /etc/issue.net
