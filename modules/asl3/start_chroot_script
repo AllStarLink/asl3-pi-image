@@ -43,16 +43,12 @@ systemctl enable avahi-daemon
 # Services no to start on boot
 systemctl disable cockpit
 
-# Setup the firewall basics
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow ssh
-ufw allow http
-ufw allow 4560:4580/udp comment 'IAX2 ports'
-ufw enable
-systemctl enable ufw
-
 # Create motd & issue
 unpack filesystem/etc/motd /etc/motd root
 echo "" > /etc/issue
 echo "" > /etc/issue.net
+
+# Set Firstboot
+unpack filesystem/usr/local/sbin/asl3-firstboot /usr/local/bin/asl3-firstboot root
+unpack filesystem/etc/systemd/system/asl3-firstboot.service /etc/systemd/system/asl3-firstboot root
+touch /asl3-first-boot-needed
