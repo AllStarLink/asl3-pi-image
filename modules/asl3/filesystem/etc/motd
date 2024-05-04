@@ -1,0 +1,22 @@
+
+  _____________________________________________________
+ / \                                                   \.
+|   |                                                  |.
+ \_ |            Welcome to AlLStarLink v3             |.
+    |                                                  |.
+    | A CLI menu is accessible by typing 'asl-menu'    |.
+    |                                                  |.
+    | Online manual is located at                      |.
+    |   https://allstarlink.github.io                  |.
+    |                                                  |.
+    | Package updates are obtained with                |.
+    |   'apt update && apt upgrade -y'                 |.
+    |                                                  |.
+    | This system uses the UFW firewall                |.
+    |                                                  |.
+    | For help visit https://community.allstarlink.org |.
+    |                                                  |.
+    |   _______________________________________________|___
+    |  /                                                  /.
+    \_/__________________________________________________/.
+
