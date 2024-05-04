@@ -13,6 +13,14 @@ if [ -e /asl3-first-boot-needed ]; then
 	systemctl enable ufw
 	systemctl start ufw
 
+
+	# Regenerate the snakeoil certificate	
+	THISHOST=$(hostnamectl hostname)
+	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+	    -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+    	-out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj \
+		"/CN=${THISHOST}.local"
+
 	# Disable firstboot
 	systemctl disable asl3-firstboot
 	systemctl mask asl3-firstboot
