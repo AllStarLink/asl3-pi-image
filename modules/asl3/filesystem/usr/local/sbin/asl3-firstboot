@@ -21,6 +21,12 @@ if [ -e /asl3-first-boot-needed ]; then
     	-out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj \
 		"/CN=${THISHOST}.local"
 
+	# Regenrate SSH keys 
+	systemctl stop ssh
+	rm /etc/ssh/ssh_host*key*
+	ssh-keygen -A
+	systemctl start ssh
+
 	# Disable firstboot
 	systemctl disable asl3-firstboot
 	systemctl mask asl3-firstboot
