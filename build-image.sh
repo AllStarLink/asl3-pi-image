@@ -24,7 +24,7 @@ while getopts "v:" opt; do
 done
 shift $((OPTIND-1))
 
-if [ "x${VER}" == "x" ]; then
+if [ -z "${VER}" ]; then
 	usage
 fi
 
@@ -46,6 +46,6 @@ fi
 cp -r ../modules/* asl3/src/modules/
 perl -pe "s/\@\@VER\@\@/${VER}/g" ../config > asl3/src/config
 pushd asl3/src
-
+echo "export ASL3_REPO_LVL=\"${REPOLVL}\"" >> config
 popd; popd;
 
