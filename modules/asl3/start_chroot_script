@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# asl3/start_chroot_script
+# Installs all of AllStarLink v3
+# Written by Jason McCormick N8EI
+# GPL V3
+########
+
+
+# Source error handling, leave this in place
+set -e
+
+source /common.sh
+install_cleanup_trap
+
+## Install AllStarLink Repo
+wget -O/tmp/asl-apt-repos.deb12_all.deb \
+	 https://repo.allstarlink.org/public/asl-apt-repos.deb12_all.deb
+dpkg -i /tmp/asl-apt-repos.deb12_all.deb
+rm -f /tmp/asl-apt-repos.deb12_all.deb
+
+## Do apt things
+apt update
+apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 \
+	cockpit cockpit-networkmanager cockpit-packagekit cockpit-sosreport \
+	cockpit-storaged cockpit-system cockpit-ws
+
+# Configure manager for Allmon
+MGR_PWD=$(openssl rand -hex 8)
+perl -pi -e "s/make4An1ce\-secret/${MGR_PWD}/g" /etc/asterisk/manager.conf
+cat - >> /etc/allmon3/allmon3.ini <<EOF
+[1999]
+host=127.0.0.1
+user=admin
+pass=${MGR_PWD}
+EOF
+
+# Services to start on boot
+systemctl enable apache2
+systemctl enable allmon3
+systemctl enable asterisk
+systemctl enable avahi-daemon
+
+

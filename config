@@ -1,0 +1,14 @@
+export DIST_NAME=AllStarLink3
+export DIST_VERSION=@@VER@@
+
+# rpi-imager json generator settings
+export RPI_IMAGER_NAME="${DIST_NAME}"
+export RPI_IMAGER_DESCRIPTION="ASL3"
+export RPI_IMAGER_WEBSITE="https://allstarlink.org"
+export RPI_IMAGER_ICON="https://raw.githubusercontent.com/guysoft/CustomPiOS/devel/media/rpi-imager-CustomPiOS.png"
+
+export MODULES="base(network,asl3)"
+
+export BASE_ARCH=aarch64
+export BASE_IMAGE_ENLARGEROOT=512
+export BASE_DISTRO=raspios64
