@@ -44,11 +44,11 @@ systemctl enable avahi-daemon
 systemctl disable cockpit
 
 # Create motd & issue
-unpack filesystem/etc/motd /etc/motd root
+unpack filesystem/etc /etc
 echo "" > /etc/issue
 echo "" > /etc/issue.net
 
 # Set Firstboot
-unpack filesystem/usr/local/sbin/asl3-firstboot /usr/local/bin/asl3-firstboot root
-unpack filesystem/etc/systemd/system/asl3-firstboot.service /etc/systemd/system/asl3-firstboot root
+unpack filesystem/usr/local/sbin/ /usr/local/bin/ root
+unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
 touch /asl3-first-boot-needed
