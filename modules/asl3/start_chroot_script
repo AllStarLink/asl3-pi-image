@@ -49,6 +49,7 @@ echo "" > /etc/issue
 echo "" > /etc/issue.net
 
 # Set Firstboot
-unpack filesystem/usr/local/sbin/ /usr/local/bin/ root
+unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
 unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
 touch /asl3-first-boot-needed
+systemctl enable asl3-firstboot
