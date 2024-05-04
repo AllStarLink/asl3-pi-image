@@ -12,6 +12,7 @@ function check_deps(){
 check_deps /usr/bin/git
 check_deps /usr/bin/gh
 check_deps /usr/bin/qemu-arm-static
+check_deps /usr/bin/xz
 
 ## Options
 function usage() { echo "Usage: $0 -v VERSION" 1>&2; exit 1; }
@@ -45,7 +46,16 @@ fi
 ./src/make_custom_pi_os -v raspios_lite_arm64 -g ./asl3
 cp -r ../modules/* asl3/src/modules/
 perl -pe "s/\@\@VER\@\@/${VER}/g" ../config > asl3/src/config
+
+## Spin the image
 pushd asl3/src
 echo "export ASL3_REPO_LVL=\"${REPOLVL}\"" >> config
-popd; popd;
+sudo ./build_dist
+popd
+
+IMGFILE=$(ls asl3/src/workspace/*.img)
+xz -c ${IMGFILE} > ../allstar3-arm64-${VER}.img.xz
+popd
+
+ls -l *.xz
 

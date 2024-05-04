@@ -22,7 +22,7 @@ rm -f /tmp/asl-apt-repos.deb12_all.deb
 apt update
 apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 \
 	cockpit cockpit-networkmanager cockpit-packagekit cockpit-sosreport \
-	cockpit-storaged cockpit-system cockpit-ws
+	cockpit-storaged cockpit-system cockpit-ws ufw
 
 # Configure manager for Allmon
 MGR_PWD=$(openssl rand -hex 8)
@@ -40,4 +40,14 @@ systemctl enable allmon3
 systemctl enable asterisk
 systemctl enable avahi-daemon
 
+# Services no to start on boot
+systemctl disable cockpit
 
+# Setup the firewall basics
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow ssh
+ufw allow http
+ufw allow 4560:4580/udp comment 'IAX2 ports'
+ufw enable
+systemctl enable ufw
