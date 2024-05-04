@@ -6,16 +6,19 @@
     |                                                  |.
     | A CLI menu is accessible by typing 'asl-menu'    |.
     |                                                  |.
+    | For Asterisk console type 'sudo asterisk -rv'    |.
+    |                                                  |.
     | Online manual is located at                      |.
     |   https://allstarlink.github.io                  |.
     |                                                  |.
     | Package updates are obtained with                |.
     |   'apt update && apt upgrade -y'                 |.
     |                                                  |.
-    | This system uses the UFW firewall                |.
+    | This system uses the UFW firewall. To enable     |.
+    | the Cockpit web administration enter the         |.
+    | command 'sudo ufw allow 9090/tcp'                |.
     |                                                  |.
     | For help visit https://community.allstarlink.org |.
-    |                                                  |.
     |   _______________________________________________|___
     |  /                                                  /.
     \_/__________________________________________________/.
