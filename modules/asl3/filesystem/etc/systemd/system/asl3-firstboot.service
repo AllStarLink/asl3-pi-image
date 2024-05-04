@@ -4,7 +4,7 @@ After=network.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/asl3-firstboot
+ExecStart=/usr/local/sbin/asl3-firstboot
 RemainAfterExit=yes
 
 [Install]
