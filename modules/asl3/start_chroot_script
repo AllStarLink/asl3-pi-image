@@ -40,13 +40,14 @@ systemctl enable allmon3
 systemctl enable asterisk
 systemctl enable avahi-daemon
 
-# Services no to start on boot
-systemctl disable cockpit
-
 # Create motd & issue
 unpack filesystem/etc /etc
 echo "" > /etc/issue
 echo "" > /etc/issue.net
+
+# HTML
+rm /var/www/html/*
+unpack filesystem/var/www/html/ /var/www/html root
 
 # Set Firstboot
 unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
