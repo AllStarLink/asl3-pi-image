@@ -15,8 +15,8 @@
     |   'apt update && apt upgrade -y'                 |.
     |                                                  |.
     | This system uses the UFW firewall. To enable     |.
-    | the Cockpit web administration enter the         |.
-    | command 'sudo ufw allow 9090/tcp'                |.
+    | a port use the command 'sudo ufw allow ####/tcp' |.
+    | or 'sudo ufw allow ####/udp'                     |.
     |                                                  |.
     | For help visit https://community.allstarlink.org |.
     |   _______________________________________________|___
