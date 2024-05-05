@@ -12,6 +12,12 @@ set -e
 source /common.sh
 install_cleanup_trap
 
+### noninteractive Check
+if [ -z "${DEBIAN_FRONTEND}" ]; then
+    export DEBIAN_FRONTEND=noninteractive
+fi
+
+
 ## Install AllStarLink Repo
 wget -O/tmp/asl-apt-repos.deb12_all.deb \
 	 https://repo.allstarlink.org/public/asl-apt-repos.deb12_all.deb
