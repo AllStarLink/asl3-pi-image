@@ -28,7 +28,7 @@ rm -f /tmp/asl-apt-repos.deb12_all.deb
 apt update
 apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 \
 	cockpit cockpit-networkmanager cockpit-packagekit cockpit-sosreport \
-	cockpit-storaged cockpit-system cockpit-ws ufw
+	cockpit-storaged cockpit-system cockpit-ws ufw python3-serial
 
 # Configure manager for Allmon
 MGR_PWD=$(openssl rand -hex 8)
@@ -55,8 +55,11 @@ echo "" > /etc/issue.net
 rm /var/www/html/*
 unpack filesystem/var/www/html/ /var/www/html root
 
-# Set Firstboot
+# usr/local
+unpack filesystem/usr/local/bin/ /usr/local/bin/ root
 unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
+
+# Set Firstboot
 unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
 touch /asl3-first-boot-needed
 systemctl enable asl3-firstboot
