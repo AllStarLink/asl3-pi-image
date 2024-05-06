@@ -40,6 +40,10 @@ user=admin
 pass=${MGR_PWD}
 EOF
 
+# Setup webserver
+a2enmod ssl
+a2ensite default-ssl
+
 # Services to start on boot
 systemctl enable apache2
 systemctl enable allmon3
