@@ -26,9 +26,10 @@ rm -f /tmp/asl-apt-repos.deb12_all.deb
 
 ## Do apt things
 apt update
+apt remove iptables
 apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 \
 	cockpit cockpit-networkmanager cockpit-packagekit cockpit-sosreport \
-	cockpit-storaged cockpit-system cockpit-ws ufw python3-serial
+	cockpit-storaged cockpit-system cockpit-ws python3-serial firewalld
 
 # Configure manager for Allmon
 MGR_PWD=$(openssl rand -hex 8)
