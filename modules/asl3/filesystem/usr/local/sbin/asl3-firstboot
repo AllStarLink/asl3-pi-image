@@ -3,30 +3,6 @@
 if [ -e /asl3-first-boot-needed ]; then
 	rm /asl3-first-boot-needed
 
-	# UFW Configuration
-#	ufw default deny incoming
-#	ufw default allow outgoing
-#	ufw allow ssh
-#	ufw allow http
-#	ufw allow https
-#	ufw allow 4560:4580/udp comment 'IAX2 ports'
-#	ufw allow 9090/tcp comment 'Cockpit'
-#	ufw allow from any app Bonjour
-#	ufw enable
-#	systemctl enable ufw
-#	systemctl start ufw
-
-	# FirewallD configuration
-	firewall-cmd -p 1667:udp
-	firewall-cmd -p 4560-4580:udp
-	firewall-cmd -s cockpit
-	firewall-cmd -s http
-	firewall-cmd -s https
-	firewall-cmd -s mdns
-	firewall-cmd -s ssh
-	systemctl enable firewalld
-	systemctl restart firewalld	
-
 	# Regenerate the snakeoil certificate	
 	THISHOST=$(hostnamectl hostname)
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
