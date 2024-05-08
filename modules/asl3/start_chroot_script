@@ -50,6 +50,7 @@ systemctl enable apache2
 systemctl enable allmon3
 systemctl enable asterisk
 systemctl enable avahi-daemon
+sustemctl enable firewalld
 
 # Create motd & issue
 unpack filesystem/etc /etc
@@ -63,6 +64,10 @@ unpack filesystem/var/www/html/ /var/www/html root
 # usr/local
 unpack filesystem/usr/local/bin/ /usr/local/bin/ root
 unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
+
+# Firewalld
+unpack filesystem/etc/firewalld/policies /etc/firewalld/policies root
+unpack filesystem/etc/firewalld/zones /etc/firewalld/zones root
 
 # Set Firstboot
 unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
