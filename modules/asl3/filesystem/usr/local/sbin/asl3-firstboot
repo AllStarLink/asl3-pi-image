@@ -17,12 +17,13 @@ if [ -e /asl3-first-boot-needed ]; then
 #	systemctl start ufw
 
 	# FirewallD configuration
-	firewall-cmd -s ssh
+	firewall-cmd -p 1667:udp
+	firewall-cmd -p 4560-4580:udp
 	firewall-cmd -s cockpit
 	firewall-cmd -s http
 	firewall-cmd -s https
-	firewall-cmd -p 4560-4580:udp
 	firewall-cmd -s mdns
+	firewall-cmd -s ssh
 	systemctl enable firewalld
 	systemctl restart firewalld	
 
