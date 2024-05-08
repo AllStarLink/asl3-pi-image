@@ -50,7 +50,7 @@ systemctl enable apache2
 systemctl enable allmon3
 systemctl enable asterisk
 systemctl enable avahi-daemon
-sustemctl enable firewalld
+systemctl enable firewalld
 
 # Create motd & issue
 unpack filesystem/etc /etc
