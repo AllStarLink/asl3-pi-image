@@ -10,7 +10,7 @@ if [ -e /asl3-first-boot-needed ]; then
 	ufw allow http
 	ufw allow https
 	ufw allow 4560:4580/udp comment 'IAX2 ports'
-	ufw allow 9090/tcp 'Cockpit'
+	ufw allow 9090/tcp comment 'Cockpit'
 	ufw allow from any app Bonjour
 	ufw enable
 	systemctl enable ufw
