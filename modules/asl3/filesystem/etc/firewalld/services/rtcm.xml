@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>RTCM</short>
+  <description>RTCM/Voter port for app_rpt</description>
+  <port port="1667" protocol="udp"/>
+</service>
+
