@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<service>
-  <short>IAX2</short>
-  <description>Asterisk IAX2 ports for AllStarLink</description>
-  <port port="4560-4580" protocol="udp"/>
-</service>
-
