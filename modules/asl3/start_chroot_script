@@ -27,7 +27,8 @@ rm -f /tmp/asl-apt-repos.deb12_all.deb
 ## Do apt things
 apt update
 apt remove -y iptables
-apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 asl3-pi-appliance
+apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 asl3-pi-appliance \
+	vim-nox
 
 # Configure manager for Allmon
 MGR_PWD=$(openssl rand -hex 8)
