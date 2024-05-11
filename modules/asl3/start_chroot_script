@@ -62,7 +62,7 @@ systemctl enable asl3-firstboot
 # Disk IO minimization
 rm -f /var/log/apache2/*
 rm -rf /var/log/journal
-rm -f /var/log/asterisk/*
+rm -rf /var/log/asterisk/*
 
 AST_UID=$(getent passwd asterisk | awk -F: '{print $3}')
 AST_GID=$(getent passwd asterisk | awk -F: '{print $4}')
