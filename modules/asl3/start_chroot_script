@@ -26,7 +26,9 @@ rm -f /tmp/asl-apt-repos.deb12_all.deb
 
 ## Do apt things
 apt update
-apt remove -y iptables
+apt remove -y iptables exim4-base exim4-config exim4-daemon-light
+apt autoremove -y
+apt purge -y exim4-base exim4-config exim4-daemon-light
 apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 asl3-pi-appliance \
 	vim-nox
 
@@ -56,3 +58,22 @@ unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
 unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
 touch /asl3-first-boot-needed
 systemctl enable asl3-firstboot
+
+# Disk IO minimization
+rm -f /var/log/apache2/*
+rm -rf /var/log/journal
+rm -f /var/log/asterisk/*
+
+AST_UID=$(getent passwd asterisk | awk -F: '{print $3}')
+AST_GID=$(getent passwd asterisk | awk -F: '{print $4}')
+cat - >> /etc/fstab <<EOF
+
+tmpfs	/tmp		tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=1777,size=128M 0 0
+tmpfs	/var/tmp	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=1777,size=128M 0 0
+
+# Delete/comment out the next line for persistent Apache logs
+tmpfs	/var/log/apache2	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=0775,size=32M 0 0
+
+# Delete/comment out the next line for persistent Asterisk logs
+tmpfs	/var/log/asterisk	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=0775,size=32M,uid=${AST_UID},gid=${AST_GID} 0 0 
+EOF
