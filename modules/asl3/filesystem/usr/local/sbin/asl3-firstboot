@@ -3,6 +3,9 @@
 if [ -e /asl3-first-boot-needed ]; then
 	rm /asl3-first-boot-needed
 
+	apt update -y
+	apt dist-upgrade -y
+
 	# Regenerate the snakeoil certificate	
 	THISHOST=$(hostnamectl hostname)
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
