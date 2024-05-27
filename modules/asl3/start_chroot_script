@@ -47,10 +47,6 @@ unpack filesystem/etc /etc
 echo "" > /etc/issue
 echo "" > /etc/issue.net
 
-# HTML
-rm /var/www/html/*
-unpack filesystem/var/www/html/ /var/www/html root
-
 # usr/local
 unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
 
