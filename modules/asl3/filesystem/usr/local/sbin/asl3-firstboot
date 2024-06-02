@@ -3,8 +3,9 @@
 if [ -e /asl3-first-boot-needed ]; then
 	rm /asl3-first-boot-needed
 
-	apt update -y
-	apt dist-upgrade -y
+	# do automated updates
+	DEBIAN_FRONTEND=noninteractive apt update -y
+	DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y
 
 	# Regenerate the snakeoil certificate	
 	THISHOST=$(hostnamectl hostname)
