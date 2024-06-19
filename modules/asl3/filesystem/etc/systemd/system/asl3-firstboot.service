@@ -1,6 +1,7 @@
 [Unit]
 Description=AllStarLink Boot Setup
-After=network.service
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
