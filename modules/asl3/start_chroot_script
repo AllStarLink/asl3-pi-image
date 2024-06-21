@@ -32,16 +32,6 @@ apt purge -y exim4-base exim4-config exim4-daemon-light
 apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 asl3-pi-appliance \
 	vim-nox
 
-# Configure manager for Allmon
-MGR_PWD=$(openssl rand -hex 8)
-perl -pi -e "s/make4An1ce\-secret/${MGR_PWD}/g" /etc/asterisk/manager.conf
-cat - >> /etc/allmon3/allmon3.ini <<EOF
-[1999]
-host=127.0.0.1
-user=admin
-pass=${MGR_PWD}
-EOF
-
 # Create motd & issue
 unpack filesystem/etc /etc
 echo "" > /etc/issue

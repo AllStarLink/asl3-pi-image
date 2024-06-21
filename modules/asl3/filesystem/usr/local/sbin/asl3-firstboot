@@ -27,6 +27,16 @@ if [ -e /asl3-first-boot-needed ]; then
 	ssh-keygen -A
 	systemctl start ssh
 
+	# Configure manager for Allmon
+	MGR_PWD=$(openssl rand -hex 8)
+	perl -pi -e "s/make4An1ce\-secret/${MGR_PWD}/g" /etc/asterisk/manager.conf
+	cat - >> /etc/allmon3/allmon3.ini <<EOF
+[1999]
+host=127.0.0.1
+user=admin
+pass=${MGR_PWD}
+EOF
+
 	# Disable firstboot
 	systemctl disable asl3-firstboot
 
