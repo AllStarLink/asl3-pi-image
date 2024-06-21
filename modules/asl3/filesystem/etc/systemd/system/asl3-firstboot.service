@@ -2,6 +2,7 @@
 Description=AllStarLink Boot Setup
 After=network-online.target
 Wants=network-online.target
+Before=asterisk.service
 
 [Service]
 Type=oneshot
