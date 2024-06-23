@@ -1,6 +1,6 @@
 [Unit]
 Description=AllStarLink Boot Setup
-After=network-online.target
+After=network-online.target time-set.target
 Wants=network-online.target
 Before=asterisk.service
 

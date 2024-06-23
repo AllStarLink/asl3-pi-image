@@ -17,7 +17,7 @@ if [ -e /asl3-first-boot-needed ]; then
 
 	# Regenerate the Cockpit certificate
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout /etc/cockpit/ws-certs.d/0-self-signed.key
+        -keyout /etc/cockpit/ws-certs.d/0-self-signed.key \
         -out /etc/cockpit/ws-certs.d/0-self-signed.cert -subj \
         "/CN=${THISHOST}.local"
 
