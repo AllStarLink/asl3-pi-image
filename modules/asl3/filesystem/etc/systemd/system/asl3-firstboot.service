@@ -1,8 +1,6 @@
 [Unit]
-Description=AllStarLink Boot Setup
-After=network-online.target time-set.target
-Wants=network-online.target
-Before=asterisk.service
+Description=AllStarLink First Boot Setup
+Before=asterisk.service allmon3.service
 
 [Service]
 Type=oneshot
