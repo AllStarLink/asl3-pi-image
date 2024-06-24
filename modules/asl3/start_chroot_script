@@ -43,7 +43,9 @@ unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
 # Set Firstboot
 unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
 touch /asl3-first-boot-needed
+systemctl enable systemd-time-wait-sync.service
 systemctl enable asl3-firstboot
+systemctl enable asl3-firstboot-pkg-updates
 
 # Disk IO minimization
 rm -f /var/log/apache2/*
