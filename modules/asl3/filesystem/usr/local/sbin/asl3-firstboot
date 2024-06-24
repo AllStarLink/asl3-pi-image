@@ -3,10 +3,6 @@
 if [ -e /asl3-first-boot-needed ]; then
 	rm /asl3-first-boot-needed
 
-	# do automated updates
-	DEBIAN_FRONTEND=noninteractive apt update -y
-	DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y
-
 	# Regenerate the snakeoil certificate	
 	THISHOST=$(hostnamectl hostname)
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
@@ -21,12 +17,6 @@ if [ -e /asl3-first-boot-needed ]; then
         -out /etc/cockpit/ws-certs.d/0-self-signed.cert -subj \
         "/CN=${THISHOST}.local"
 
-	# Regenrate SSH keys 
-	systemctl stop ssh
-	rm /etc/ssh/ssh_host*key*
-	ssh-keygen -A
-	systemctl start ssh
-
 	# Configure manager for Allmon
 	MGR_PWD=$(openssl rand -hex 8)
 	perl -pi -e "s/make4An1ce\-secret/${MGR_PWD}/g" /etc/asterisk/manager.conf
@@ -39,6 +29,4 @@ EOF
 
 	# Disable firstboot
 	systemctl disable asl3-firstboot
-
 fi
-
