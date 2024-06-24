@@ -1,0 +1,8 @@
+#!/usr/bin/bash
+
+# do automated updates
+DEBIAN_FRONTEND=noninteractive apt update -y
+DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y
+
+# Disable firstboot
+systemctl disable asl3-firstboot-pkg-updates

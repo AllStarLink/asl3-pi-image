@@ -1,0 +1,12 @@
+[Unit]
+Description=Update packages on firstboot
+After=time-sync.target
+Wants=time-sync.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/asl3-firstboot-pkg-updates
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
