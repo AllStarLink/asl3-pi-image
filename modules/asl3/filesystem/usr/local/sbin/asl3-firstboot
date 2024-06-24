@@ -27,6 +27,9 @@ user=admin
 pass=${MGR_PWD}
 EOF
 
+	# Enable /dev/serial0
+	/usr/bin/asl-enable-pi-serial
+
 	# Disable firstboot
 	systemctl disable asl3-firstboot
 fi
