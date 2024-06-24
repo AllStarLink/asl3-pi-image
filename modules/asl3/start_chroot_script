@@ -65,3 +65,6 @@ tmpfs	/var/log/apache2	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=0775,size
 # Delete/comment out the next line for persistent Asterisk logs
 tmpfs	/var/log/asterisk	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=0775,size=32M,uid=${AST_UID},gid=${AST_GID} 0 0 
 EOF
+
+# Disable bluetooth for GPIO accessibility
+echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt
