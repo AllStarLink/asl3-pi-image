@@ -11,7 +11,9 @@ function check_deps(){
 
 check_deps /usr/bin/git
 check_deps /usr/bin/gh
-check_deps /usr/bin/qemu-arm-static
+if [ "$(uname -m)" != "aarch64" ]; then
+	check_deps /usr/bin/qemu-arm-static
+fi
 check_deps /usr/bin/xz
 
 ## Options
