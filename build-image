@@ -40,6 +40,9 @@ git clone --depth 1 https://github.com/guysoft/CustomPiOS
 ## Generate the image build system
 pushd CustomPiOS
 
+# Install the patch
+patch -p1 < ../native_aarch64_no_qemu.patch
+
 if [ -d asl3 ]; then
 	echo "ERROR: Image structure asl3 already exists" 1>&2
 	exit 1
@@ -56,8 +59,14 @@ sudo ./build_dist
 popd
 
 IMGFILE=$(ls asl3/src/workspace/*.img)
-xz -c ${IMGFILE} > ../allstar3-arm64-${VER}.img.xz
+xz -T 0 -c ${IMGFILE} > ../allstar3-arm64-${VER}.img.xz
 popd
 
 ls -l *.xz
+
+## Copy to repo
+echo ${SSH_REPO_AWS_PI_IMAGE_KEY} > ~/.ssh/id_ed25519
+chmod 600 ~/.ssh/id_ed25519
+SSH_VARS="-i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-image@repo-admin.allstarlink.org
 
