@@ -47,7 +47,8 @@ if [ -d asl3 ]; then
 	echo "ERROR: Image structure asl3 already exists" 1>&2
 	exit 1
 fi
- 
+
+export USER=root 
 ./src/make_custom_pi_os -v raspios_lite_arm64 -g ./asl3
 cp -r ../modules/* asl3/src/modules/
 perl -pe "s/\@\@VER\@\@/${VER}/g" ../config > asl3/src/config
@@ -68,5 +69,6 @@ ls -l *.xz
 echo ${SSH_REPO_AWS_PI_IMAGE_KEY} > ~/.ssh/id_ed25519
 chmod 600 ~/.ssh/id_ed25519
 SSH_VARS="-i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
-scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-image@repo-admin.allstarlink.org
-
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-image@repo-admin.allstarlink.org:/var/www/html/images/pi
+sha256sum allstar3-arm64-${VER}.img.xz > allstar3-arm64-${VER}.img.xz.sha256
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz.sha256 aws-pi-image@repo-admin.allstarlink.org:/var/www/html/images/pi
