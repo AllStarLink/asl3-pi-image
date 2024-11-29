@@ -16,6 +16,8 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 check_deps /usr/bin/xz
 
+apt install python3-git
+
 ## Options
 function usage() { echo "Usage: $0 -v VERSION" 1>&2; exit 1; }
 
