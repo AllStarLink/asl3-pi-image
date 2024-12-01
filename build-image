@@ -61,6 +61,7 @@ echo "export ASL3_REPO_LVL=\"${REPOLVL}\"" >> config
 sudo ./build_dist
 popd
 
+echo "Compressing image... this takes a long time...."
 IMGFILE=$(ls asl3/src/workspace/*.img)
 xz -T 0 -c ${IMGFILE} > ../allstar3-arm64-${VER}.img.xz
 popd
