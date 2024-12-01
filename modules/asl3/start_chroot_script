@@ -68,3 +68,6 @@ EOF
 
 # Disable bluetooth for GPIO accessibility
 echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt
+
+# Cleanup old kernels
+/usr/local/sbin/minimize-kernels

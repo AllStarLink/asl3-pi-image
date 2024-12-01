@@ -1,0 +1,32 @@
+#!/usr/bin/bash
+
+set -x
+
+case "$1" in
+	bookworm)
+		IMAGE_A=linux-image-rpi-2712
+		IMAGE_B=linux-image-rpi-v8
+		;;
+	*)
+		echo "Unsupported Debian release or none specified"
+		exit 1
+		;;
+esac
+
+LV_A=$(dpkg -l | grep ${IMAGE_A} | awk '{print $3}' | sed -e 's/1\://g')
+LV_B=$(dpkg -l | grep ${IMAGE_A} | awk '{print $3}' | sed -e 's/1\://g')
+
+PKGS_TO_REMOVE=""
+
+for v in `dpkg -l | grep linux-image | grep -v ${LV_A} | awk '{print $3}' | sed -e 's/1\://g' | sort -u`
+do
+	echo "Removing ${v}..."
+	r=$(dpkg -l | grep ${v} | awk '{print $2}' | tr '\n' ' ')
+	PKGS_TO_REMOVE="${PKGS_TO_REMOVE} ${r}"
+done
+
+apt remove -y ${PKGS_TO_REMOVE}
+apt autoremove -y
+apt purge -y `dpkg -l | grep -E '^rc' | awk '{print $2}' | tr '\n' ' '`
+
+
