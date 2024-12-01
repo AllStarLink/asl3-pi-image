@@ -17,6 +17,9 @@ if [ -z "${DEBIAN_FRONTEND}" ]; then
     export DEBIAN_FRONTEND=noninteractive
 fi
 
+# usr/local
+unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
+
 ## Cleanup old kernels first, minimize size and number of DKMS builds needed
 /usr/local/sbin/minimize-kernels \
 	$(grep VERSION_CODENAME /etc/os-release | awk 'BEGIN {FS="="};{print $2}')
@@ -39,9 +42,6 @@ apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 asl3-pi-appliance \
 unpack filesystem/etc /etc
 echo "" > /etc/issue
 echo "" > /etc/issue.net
-
-# usr/local
-unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
 
 # Set Firstboot
 unpack filesystem/etc/systemd/system/ /etc/systemd/system/ root
