@@ -14,15 +14,18 @@ case "$1" in
 esac
 
 LV_A=$(dpkg -l | grep ${IMAGE_A} | awk '{print $3}' | sed -e 's/1\://g')
-LV_B=$(dpkg -l | grep ${IMAGE_A} | awk '{print $3}' | sed -e 's/1\://g')
+LV_B=$(dpkg -l | grep ${IMAGE_B} | awk '{print $3}' | sed -e 's/1\://g')
 
 PKGS_TO_REMOVE=""
 
-for v in `dpkg -l | grep linux-image | grep -v ${LV_A} | awk '{print $3}' | sed -e 's/1\://g' | sort -u`
+for l in ${LV_A} ${LV_B}
 do
-	echo "Removing ${v}..."
-	r=$(dpkg -l | grep ${v} | awk '{print $2}' | tr '\n' ' ')
-	PKGS_TO_REMOVE="${PKGS_TO_REMOVE} ${r}"
+	for v in `dpkg -l | grep linux-image | grep -v ${l} | awk '{print $3}' | sed -e 's/1\://g' | sort -u`
+	do
+		echo "Removing ${v}..."
+		r=$(dpkg -l | grep ${v} | awk '{print $2}' | tr '\n' ' ')
+		PKGS_TO_REMOVE="${PKGS_TO_REMOVE} ${r}"
+	done
 done
 
 apt remove -y ${PKGS_TO_REMOVE}
