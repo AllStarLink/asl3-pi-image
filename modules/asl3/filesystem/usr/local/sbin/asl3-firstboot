@@ -28,7 +28,8 @@ pass=${MGR_PWD}
 EOF
 
 	# Enable /dev/serial0
-	/usr/bin/asl-enable-pi-serial
+	raspi-config nonint do_serial_hw 0
+	raspi-config nonint do_serial_cons 1
 
 	# Disable firstboot
 	systemctl disable asl3-firstboot
