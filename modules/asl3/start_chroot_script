@@ -70,4 +70,5 @@ EOF
 echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt
 
 # Cleanup old kernels
-/usr/local/sbin/minimize-kernels
+/usr/local/sbin/minimize-kernels \
+	$(grep VERSION_CODENAME /etc/os-release | awk 'BEGIN {FS="="};{print $2}')
