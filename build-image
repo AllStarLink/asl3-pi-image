@@ -16,7 +16,7 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 check_deps /usr/bin/xz
 
-apt install -y python3-git
+apt install -y python3-git lsof
 
 ## Options
 function usage() { echo "Usage: $0 -v VERSION" 1>&2; exit 1; }
@@ -43,7 +43,7 @@ git clone --depth 1 https://github.com/guysoft/CustomPiOS
 pushd CustomPiOS
 
 # Install the patch
-patch -p1 < ../native_aarch64_no_qemu.patch
+patch -p1 < ../aarch64_fixes.patch
 
 if [ -d asl3 ]; then
 	echo "ERROR: Image structure asl3 already exists" 1>&2
