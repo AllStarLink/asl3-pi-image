@@ -44,7 +44,6 @@ pushd CustomPiOS
 
 # Install the patch
 patch -p1 < ../aarch64_fixes.patch
-patch -p1 < ../sysfs_fixes.patch
 
 if [ -d asl3 ]; then
 	echo "ERROR: Image structure asl3 already exists" 1>&2
