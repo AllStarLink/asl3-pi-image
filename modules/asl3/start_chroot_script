@@ -17,6 +17,9 @@ if [ -z "${DEBIAN_FRONTEND}" ]; then
     export DEBIAN_FRONTEND=noninteractive
 fi
 
+## Cleanup old kernels first, minimize size and number of DKMS builds needed
+/usr/local/sbin/minimize-kernels \
+	$(grep VERSION_CODENAME /etc/os-release | awk 'BEGIN {FS="="};{print $2}')
 
 ## Install AllStarLink Repo
 wget -O/tmp/asl-apt-repos.deb12_all.deb \
@@ -69,6 +72,4 @@ EOF
 # Disable bluetooth for GPIO accessibility
 echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt
 
-# Cleanup old kernels
-/usr/local/sbin/minimize-kernels \
-	$(grep VERSION_CODENAME /etc/os-release | awk 'BEGIN {FS="="};{print $2}')
+
