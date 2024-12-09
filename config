@@ -19,3 +19,8 @@ export BASE_BOARD=raspberrypiarm64
 # PKGUPGRADE
 export PKGUPGRADE_DISTUPGRADE=y
 export PKGUPGRADE_DISTUPGRADE_METHOD=dist-upgrade
+
+# For modules/network
+export NETWORK_WPA_SUPPLICANT=no
+export NETWORK_NETWORK_MANAGER=no
+
