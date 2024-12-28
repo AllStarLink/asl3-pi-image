@@ -24,7 +24,7 @@ index 2b086a0..bcb0897 100755
 -  echo 'exit 0' >> /etc/rc.local
 +if [ "$NETWORK_ENABLE_NTP_QUIRKS" == "yes" ]; then
 +	if [ ! -f "/etc/rc.local" ];then
-+	  echo 'exit 0' >> /etc/rc.local
++	  echo '/bin/sh -e' > /etc/rc.local
 +	fi
 +	
 +	# prevent ntp updates from failing due to some Rpi3 weirdness, see also "Fix SSH" further below
