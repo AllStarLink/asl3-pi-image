@@ -44,7 +44,6 @@ pushd CustomPiOS
 
 # Install the patches for CustomPiOS
 patch -p1 < ../aarch64_fixes.patch
-patch -p1 < ../wpa_supp_fix1.patch
 patch -p1 < ../mod_net_quirks.patch
 
 if [ -d asl3 ]; then
