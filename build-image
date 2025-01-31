@@ -77,6 +77,6 @@ ls -l *.xz
 echo "${SSH_REPO_AWS_PI_IMAGE_KEY}" > id_ed25519
 chmod 600 id_ed25519
 SSH_VARS="-i id_ed25519 -o StrictHostKeyChecking=accept-new"
-scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-builder@repo-admin.allstarlink.org:/var/www/html/images/pi
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-builder@aws-east1a-web1.allstarlink.org:/var/www/html/images/pi
 sha256sum allstar3-arm64-${VER}.img.xz > allstar3-arm64-${VER}.img.xz.sha256
-scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz.sha256 aws-pi-builder@repo-admin.allstarlink.org:/var/www/html/images/pi
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz.sha256 aws-pi-builder@aws-east1a-web1.allstarlink.org:/var/www/html/images/pi
