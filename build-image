@@ -37,7 +37,7 @@ fi
 set -e
 
 ## Clone the CustomPiOS Builder
-git clone --depth 1 https://github.com/guysoft/CustomPiOS
+git clone --depth 1 https://github.com/jxmx/CustomPiOS
 
 ## Generate the image build system
 pushd CustomPiOS
