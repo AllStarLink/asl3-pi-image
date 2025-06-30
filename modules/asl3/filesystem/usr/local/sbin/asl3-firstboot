@@ -3,19 +3,20 @@
 if [ -e /asl3-first-boot-needed ]; then
 	rm /asl3-first-boot-needed
 
-	# Regenerate the snakeoil certificate	
 	THISHOST=$(hostnamectl hostname)
+
+	# Regenerate the snakeoil certificate
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-	    -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
-    	-out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj \
+		-keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+		-out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj \
 		"/CN=${THISHOST}.local"
 	systemctl restart apache2
 
 	# Regenerate the Cockpit certificate
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout /etc/cockpit/ws-certs.d/0-self-signed.key \
-        -out /etc/cockpit/ws-certs.d/0-self-signed.cert -subj \
-        "/CN=${THISHOST}.local"
+		-keyout /etc/cockpit/ws-certs.d/0-self-signed.key \
+		-out /etc/cockpit/ws-certs.d/0-self-signed.cert -subj \
+		"/CN=${THISHOST}.local"
 
 	# Configure manager for Allmon
 	MGR_PWD=$(openssl rand -hex 8)
@@ -30,7 +31,8 @@ EOF
 	# Enable /dev/serial0
 	raspi-config nonint do_serial_hw 0
 	raspi-config nonint do_serial_cons 1
-
-	# Disable firstboot
-	systemctl disable asl3-firstboot
 fi
+
+# Disable service
+systemctl disable asl3-firstboot
+
