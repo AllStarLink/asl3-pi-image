@@ -6,14 +6,20 @@ on:
       img-ver:
         description: 'Image version (e.g. 3.0.12)'
         type: string
+      repo-dir:
+        description: 'Repo Directory'
+        type: choice
+        options:
+          - main
+          - beta
+          - devel
 
 env:
   SSH_REPO_AWS_PI_IMAGE_KEY: ${{secrets.SSH_REPO_AWS_PI_IMAGE_KEY}}
-
 
 jobs:
   make-packages:
     uses: AllStarLink/asl3-pi-image/.github/workflows/ephemeral_ec2_run-this.yml@develop
     with:
-      run-this: ./build-image -v ${{inputs.img-ver}}
+      run-this: ./build-image -v ${{inputs.img-ver}} -r ${{inputs.repo-dir}}
     secrets: inherit

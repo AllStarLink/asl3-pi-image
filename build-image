@@ -19,10 +19,11 @@ check_deps /usr/bin/xz
 apt install -y python3-git lsof
 
 ## Options
-function usage() { echo "Usage: $0 -v VERSION" 1>&2; exit 1; }
+function usage() { echo "Usage: $0 -v VERSION -r (main|beta|devel)" 1>&2; exit 1; }
 
-while getopts "v:" opt; do
+while getopts "r:v:" opt; do
 	case $opt in
+		r) REPO="$OPTARG" ;;
 		v) VER="$OPTARG" ;;
 		*) usage ;;
 	esac
@@ -32,6 +33,16 @@ shift $((OPTIND-1))
 if [ -z "${VER}" ]; then
 	usage
 fi
+
+if [ -z "${REPO}" ]; then
+	usage
+fi
+case "$REPO" in
+    "main"  ) REPO_PATH="/var/www/html/images/pi" ;;
+    "beta"  ) REPO_PATH="/var/www/html/images/pi/beta" ;;
+    "devel" ) REPO_PATH="/var/www/html/images/pi/devel" ;;
+    *) usage ;;
+esac
 
 ## Error out immediately on any problem
 set -e
@@ -77,6 +88,6 @@ ls -l *.xz
 echo "${SSH_REPO_AWS_PI_IMAGE_KEY}" > id_ed25519
 chmod 600 id_ed25519
 SSH_VARS="-i id_ed25519 -o StrictHostKeyChecking=accept-new"
-scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-builder@aws-east1a-web1.allstarlink.org:/var/www/html/images/pi
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-builder@aws-east1a-web1.allstarlink.org:${REPO_PATH}
 sha256sum allstar3-arm64-${VER}.img.xz > allstar3-arm64-${VER}.img.xz.sha256
-scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz.sha256 aws-pi-builder@aws-east1a-web1.allstarlink.org:/var/www/html/images/pi
+scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz.sha256 aws-pi-builder@aws-east1a-web1.allstarlink.org:${REPO_PATH}
