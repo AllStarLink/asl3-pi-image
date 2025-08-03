@@ -1,0 +1,12 @@
+[Unit]
+Description=Reboot system after firstboot services have finished
+After=asl3-firstboot.service asl3-firstboot-pkg-updates.service
+Requires=asl3-firstboot.service asl3-firstboot-pkg-updates.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/asl3-firstboot-complete
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -49,6 +49,7 @@ touch /asl3-first-boot-needed
 systemctl enable systemd-time-wait-sync.service
 systemctl enable asl3-firstboot
 systemctl enable asl3-firstboot-pkg-updates
+systemctl enable asl3-firstboot-complete
 
 # Disk IO minimization
 rm -f /var/log/apache2/*
@@ -69,7 +70,15 @@ tmpfs	/var/log/apache2	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=0775,size
 tmpfs	/var/log/asterisk	tmpfs	defaults,noatime,nosuid,nodev,noexec,mode=0775,size=32M,uid=${AST_UID},gid=${AST_GID} 0 0 
 EOF
 
-# Disable bluetooth for GPIO accessibility
-echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt
+## For GPIO accessibility, enable serial and disable bluetooth
+cat - >> /boot/firmware/config.txt <<EOF
+# ------------ Universal serial port on pins 8 / 10 -------------
+[all]                     # applies to every Raspberry Pi model
+enable_uart=1             # guarantees /dev/serial0 is created
+dtoverlay=disable-bt      # kills the on-board BT radio
+#  (on Pi 5 this is transparently remapped to the
+#   Pi-5-specific overlay “disable-bt-pi5”)
+# ---------------------------------------------------------------
 
+EOF
 

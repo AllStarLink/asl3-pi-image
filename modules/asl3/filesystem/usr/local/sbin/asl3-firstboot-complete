@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+
+# Remove our early boot "message of the day"
+rm -f /etc/motd.d/asl3-firstboot
+
+# Disable service
+systemctl disable asl3-firstboot-complete
+
+# Reboot (after other firstboot services have completed)
+systemctl reboot
+
