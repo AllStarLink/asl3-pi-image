@@ -16,7 +16,7 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 check_deps /usr/bin/xz
 
-apt install -y python3-git lsof
+apt install -y python3-git lsof 7zip jq
 
 ## Options
 function usage() { echo "Usage: $0 -v VERSION -r (main|beta|devel)" 1>&2; exit 1; }
@@ -54,7 +54,6 @@ git clone --depth 1 https://github.com/jxmx/CustomPiOS
 pushd CustomPiOS
 
 # Install the patches for CustomPiOS
-patch -p1 < ../aarch64_fixes.patch
 patch -p1 < ../mod_net_quirks.patch
 
 if [ -d asl3 ]; then
@@ -63,7 +62,7 @@ if [ -d asl3 ]; then
 fi
 
 export USER=root 
-./src/make_custom_pi_os -v raspios_lite_arm64 -g ./asl3
+./src/make_custom_pi_os -v raspios_oldstable_lite_arm64 -g ./asl3
 cp -r ../modules/* asl3/src/modules/
 perl -pe "s/\@\@VER\@\@/${VER}/g" ../config > asl3/src/config
 

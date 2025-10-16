@@ -24,3 +24,6 @@ export PKGUPGRADE_DISTUPGRADE_METHOD=dist-upgrade
 export NETWORK_WPA_SUPPLICANT=no
 export NETWORK_NETWORK_MANAGER=no
 
+# Used in asl3/start_chroot_script for picking the packages repo
+#export A_R_S=beta
+#export A_R_S=devel
