@@ -16,6 +16,7 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 check_deps /usr/bin/xz
 
+apt update
 apt install -y python3-git lsof 7zip jq
 
 ## Options
