@@ -3,7 +3,7 @@ This repo and its .img.xz output contains only the elements for ASL3 that
 are used for the installer media of the "turnkey" Pi appliance.
 In general, any issues
 with ASL3 should be filed at [ASL3](https://github.com/AllStarLink/ASL3)
-or [app_rpt](https://github.com/AllStarLink/app_rpt).
+or [appi\_rpt](https://github.com/AllStarLink/app_rpt).
 
 Only open an issue with this repository if you have been instructed
 to do so by an ASL developer or the ASL Helpdesk.
@@ -18,6 +18,13 @@ For ASL3 production use, assembly is done through the GitHub Action
 assembly job. The assembly is executed on an AWS arm64 Debian 12
 instance so that all of the execution does not have to run through
 the qmeu-arm-static emulator. 
+
+As of 2025-11-15 there are two branches of this repository that 
+matter:
+
+* **develop** - This is the main branch and focuses on Debian 13 Trixie
+* **bookworm** - This is the Debian 12 Bookworm branch to build 
+    update-only spins of the image (i.e. package collection updates)
 
 One of the SLOWEST parts of the job is compressing back down the image file
 with `xz`. The `build-image` script is optmized to use `xz -T0` which will use
