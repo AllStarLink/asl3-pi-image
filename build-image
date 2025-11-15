@@ -69,8 +69,8 @@ perl -pe "s/\@\@VER\@\@/${VER}/g" ../config > asl3/src/config
 
 ## Spin the image
 pushd asl3/src
-echo "export ASL3_REPO_LVL=\"${REPOLVL}\"" >> config
-echo "export A_R_S=\"${REPOLVL}\"" >> config
+echo "export ASL3_REPO_LVL=\"${REPO}\"" >> config
+echo "export A_R_S=\"${REPO}\"" >> config
 
 # Fix the image path - see https://github.com/guysoft/CustomPiOS/issues/243
 mv image image-raspberrypiarm64
