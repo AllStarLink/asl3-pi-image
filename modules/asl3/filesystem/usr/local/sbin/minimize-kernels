@@ -7,6 +7,10 @@ case "$1" in
 		IMAGE_A=linux-image-rpi-2712
 		IMAGE_B=linux-image-rpi-v8
 		;;
+	trixie)
+		IMAGE_A=linux-image-rpi-2712
+		IMAGE_B=linux-image-rpi-v8
+		;;
 	*)
 		echo "Unsupported Debian release or none specified"
 		exit 1
