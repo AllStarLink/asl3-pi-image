@@ -39,8 +39,7 @@ apt autoremove -y
 	$(grep VERSION_CODENAME /etc/os-release | awk 'BEGIN {FS="="};{print $2}')
 
 ## Now Install ASL3
-apt install -y asl3 asl3-menu asl3-update-nodelist allmon3 asl3-pi-appliance \
-	vim-nox
+apt install -y asl3 asl3-menu allmon3 asl3-appliance-pi vim-nox
 
 # Create motd & issue
 unpack filesystem/etc /etc
