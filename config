@@ -11,7 +11,7 @@ export MODULES="base(network,pkgupgrade,asl3)"
 
 # Base configuration
 export BASE_ARCH=aarch64
-export BASE_IMAGE_ENLARGEROOT=512
+export BASE_IMAGE_ENLARGEROOT=1024
 export BASE_DISTRO=raspios64
 export BASE_ADD_USER=no
 export BASE_BOARD=raspberrypiarm64
