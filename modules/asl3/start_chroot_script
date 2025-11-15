@@ -21,10 +21,10 @@ fi
 unpack filesystem/usr/local/sbin/ /usr/local/sbin/ root
 
 ## Install AllStarLink Repo
-wget -O/tmp/asl-apt-repos.deb12_all.deb \
-	 https://repo.allstarlink.org/public/asl-apt-repos.deb12_all.deb
-dpkg -i /tmp/asl-apt-repos.deb12_all.deb
-rm -f /tmp/asl-apt-repos.deb12_all.deb
+wget -O/tmp/asl-apt-repos.deb13_all.deb \
+	 https://repo.allstarlink.org/public/asl-apt-repos.deb13_all.deb
+dpkg -i /tmp/asl-apt-repos.deb13_all.deb
+rm -f /tmp/asl-apt-repos.deb13_all.deb
 
 if [ ! -z "${A_R_S}" ]; then
 	asl-repo-switch -l ${A_R_S}
