@@ -32,9 +32,7 @@ fi
 
 ## Apt Updates
 apt update
-apt remove -y iptables exim4-base exim4-config exim4-daemon-light
 apt autoremove -y
-apt purge -y exim4-base exim4-config exim4-daemon-light
 
 # Cleanup old kernels, minimize size and number of DKMS builds needed
 /usr/local/sbin/minimize-kernels \
