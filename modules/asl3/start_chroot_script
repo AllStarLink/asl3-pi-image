@@ -25,6 +25,7 @@ wget -O/tmp/asl-apt-repos.deb13_all.deb \
 	 https://repo.allstarlink.org/public/asl-apt-repos.deb13_all.deb
 dpkg -i /tmp/asl-apt-repos.deb13_all.deb
 rm -f /tmp/asl-apt-repos.deb13_all.deb
+dpkg --remove-architecture armhf
 
 if [ ! -z "${A_R_S}" ]; then
 	asl-repo-switch -l ${A_R_S}
