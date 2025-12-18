@@ -93,7 +93,7 @@ def require_root_or_www_data_for_writes() -> Tuple[Optional[Tuple[int, int]], st
         who = pwd.getpwuid(euid).pw_name
     except KeyError:
         who = str(euid)
-    raise SystemExit(f"ERROR: must run as root or aws-pi-builder to write repo JSON files (current euid={who})")
+    raise SystemExit(f"ERROR: must run as root or aws-pi-builder to write repo manifest files (current euid={who})")
 
 
 def mkdir_parents_with_optional_chown(dir_path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
@@ -226,7 +226,7 @@ def write_json(obj: dict, output: str, chown_ids: Optional[Tuple[int, int]]) -> 
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Generate a Raspberry Pi Imager os_list JSON entry for an AllStarLink .img.xz",
+        description="Generate a Raspberry Pi Imager os_list manifest entry for an AllStarLink .img.xz",
     )
     ap.add_argument("img_xz", help="Path to allstar3-arm64-<version>.img.xz")
     ap.add_argument(
@@ -243,7 +243,7 @@ def main() -> int:
     ap.add_argument(
         "--output",
         default="-",
-        help="Write JSON to this path (default: - for stdout)",
+        help="Write manifest JSON to this path (default: - for stdout)",
     )
 
     args = ap.parse_args()

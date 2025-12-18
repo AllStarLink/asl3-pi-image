@@ -21,6 +21,9 @@ DATE_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 #  >= 3.1.0 => Trixie
 TRIXIE_CUTOFF: Tuple[int, ...] = (3, 1, 0)
 
+# Per-image manifest extension (JSON content, different filename extension).
+MANIFEST_EXT = ".rpi-imager-manifest"
+
 log = logging.getLogger("repo_rpi_imager_update")
 
 
@@ -65,7 +68,7 @@ def require_root_or_www_data_for_writes() -> Tuple[Optional[Tuple[int, int]], st
         who = pwd.getpwuid(euid).pw_name
     except KeyError:
         who = str(euid)
-    raise SystemExit(f"ERROR: must run as root or aws-pi-builder to write repo JSON files (current euid={who})")
+    raise SystemExit(f"ERROR: must run as root or aws-pi-builder to write repo manifest files (current euid={who})")
 
 
 def mkdir_parents_with_optional_chown(dir_path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
@@ -209,19 +212,19 @@ def vt_ge(a: Tuple[int, ...], b: Tuple[int, ...]) -> bool:
 def run_generator(
     cfg: Config,
     img: Path,
-    json_path: Path,
+    out_path: Path,
     rel_dir: str,
     release_date: Optional[str],
     chown_ids: Optional[Tuple[int, int]],
 ) -> None:
-    mkdir_parents_with_optional_chown(json_path.parent, chown_ids)
+    mkdir_parents_with_optional_chown(out_path.parent, chown_ids)
 
     cmd = [cfg.create_cmd]
     if release_date:
         cmd += ["--release-date", release_date]
     if rel_dir and rel_dir != ".":
         cmd += ["--location", rel_dir]
-    cmd += ["--output", str(json_path), str(img)]
+    cmd += ["--output", str(out_path), str(img)]
 
     try:
         subprocess.run(cmd, check=True)
@@ -230,35 +233,35 @@ def run_generator(
     except subprocess.CalledProcessError as e:
         die(f"Generator failed (exit={e.returncode}) for {img}", e.returncode)
 
-    if not json_path.exists():
-        die(f"JSON was not created: {json_path}")
+    if not out_path.exists():
+        die(f"Manifest was not created: {out_path}")
 
     # If update is running as root, enforce ownership regardless of generator behavior.
-    chown_path_if_root(json_path, chown_ids)
+    chown_path_if_root(out_path, chown_ids)
 
 
-def ensure_json_correct(
+def ensure_manifest_correct(
     cfg: Config,
     img: Path,
-    json_path: Path,
+    manifest_path: Path,
     rel_img: str,
     rel_dir: str,
     chown_ids: Optional[Tuple[int, int]],
 ) -> None:
     """
-    If JSON missing -> create.
-    If JSON exists but URL-path suffix doesn't match expected -> recreate/overwrite,
+    If manifest missing -> create.
+    If manifest exists but URL-path suffix doesn't match expected -> recreate/overwrite,
     preserving existing os_list[0].release_date when available.
-    If JSON exists but is malformed (missing url) -> recreate (no release_date preserved unless present).
+    If manifest exists but is malformed (missing url) -> recreate (no release_date preserved unless present).
     Then validate strictly.
     """
     exp = expected_url_suffix(cfg.image_subdir, rel_img)
 
-    need_regen = not json_path.exists()
+    need_regen = not manifest_path.exists()
     preserve_release_date: Optional[str] = None
 
-    if json_path.exists():
-        data = load_json_safe(json_path)
+    if manifest_path.exists():
+        data = load_json_safe(manifest_path)
         url_path, rd = extract_os0_fields(data) if data is not None else (None, None)
 
         if url_path is None:
@@ -269,26 +272,26 @@ def ensure_json_correct(
             preserve_release_date = rd
 
     if need_regen:
-        if json_path.exists():
-            log.info("Recreating JSON: %s", json_path)
+        if manifest_path.exists():
+            log.info("Recreating manifest: %s", manifest_path)
         else:
-            log.info("Creating missing JSON: %s", json_path)
+            log.info("Creating missing manifest: %s", manifest_path)
 
         if preserve_release_date:
             log.info("  preserving release_date: %s", preserve_release_date)
 
-        run_generator(cfg, img, json_path, rel_dir, preserve_release_date, chown_ids)
+        run_generator(cfg, img, manifest_path, rel_dir, preserve_release_date, chown_ids)
 
-    data = load_json_safe(json_path)
+    data = load_json_safe(manifest_path)
     if data is None:
-        die(f"Failed to parse JSON after creation: {json_path}", 2)
+        die(f"Failed to parse manifest JSON after creation: {manifest_path}", 2)
 
     url_path, _ = extract_os0_fields(data)
     if not url_path:
-        die(f"Missing/invalid os_list[0].url in {json_path}", 2)
+        die(f"Missing/invalid os_list[0].url in {manifest_path}", 2)
 
     if not url_path.endswith(exp):
-        log.error("url mismatch in %s", json_path)
+        log.error("url mismatch in %s", manifest_path)
         log.error("  expected URL path to end with: %s", exp)
         log.error("  found URL path: %s", url_path)
         raise SystemExit(3)
@@ -334,10 +337,23 @@ def ensure_symlink(
     log.info("Symlink: %s -> %s", link, target_rel)
 
 
+def remove_path_if_exists(path: Path) -> None:
+    try:
+        if path.is_symlink() or path.exists():
+            path.unlink()
+    except FileNotFoundError:
+        pass
+    except IsADirectoryError:
+        pass
+
+
 def parse_args(argv: List[str]) -> Config:
     p = argparse.ArgumentParser(
         prog=Path(sys.argv[0]).name,
-        description="Ensure per-image Raspberry Pi Imager JSON files exist and generate a top-level rpi-imager-os-list.json.",
+        description=(
+            "Ensure per-image Raspberry Pi Imager manifest files exist (JSON content with .rpi-imager-manifest extension) "
+            "and generate a top-level rpi-imager-os-list.json."
+        ),
     )
     p.add_argument(
         "--root-dir",
@@ -352,12 +368,12 @@ def parse_args(argv: List[str]) -> Config:
     p.add_argument(
         "--json-dir",
         default="",
-        help="Directory to write/read JSON files (default: IMAGE_ROOT).",
+        help="Directory to write/read manifest files (default: IMAGE_ROOT).",
     )
     p.add_argument(
         "--create-json-cmd",
         default="repo_create_imager_json",
-        help="Generator command to create JSON files (default: %(default)s).",
+        help="Generator command to create manifest files (default: %(default)s).",
     )
     a = p.parse_args(argv)
 
@@ -378,7 +394,7 @@ def parse_args(argv: List[str]) -> Config:
 def main(argv: List[str]) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    # This script always writes JSON (per-image and the combined os-list),
+    # This script always writes manifests (per-image and the combined os-list),
     # so enforce privileges unconditionally.
     chown_ids, who = require_root_or_www_data_for_writes()
     log.info("Running as %s (writes enabled)", who)
@@ -408,17 +424,17 @@ def main(argv: List[str]) -> int:
 
     log.info("Image root: %s", cfg.image_root)
     if cfg.json_dir != cfg.image_root:
-        log.info(".json root: %s", cfg.json_dir)
+        log.info("manifest root: %s", cfg.json_dir)
     if skipped > 0:
         log.info("Skipped due to name mismatch: %d", skipped)
 
-    # Collect latest per x.y (major.minor), using ONLY top-level images (no IMAGE_ROOT subdirectories).
-    seen_minors: set[Tuple[int, int]] = set()
-    picked_os_lists: List[List[dict]] = []
+    # Track latest top-level Bookworm/Trixie manifest paths (based on TRIXIE_CUTOFF).
+    latest_bookworm_manifest: Optional[Path] = None
+    latest_trixie_manifest: Optional[Path] = None
 
-    # Track latest top-level Bookworm/Trixie JSON paths (based on TRIXIE_CUTOFF).
-    latest_bookworm_json: Optional[Path] = None
-    latest_trixie_json: Optional[Path] = None
+    # Track latest overall (top-level) manifest + os_list for rpi-imager-os-list.json.
+    latest_overall_manifest: Optional[Path] = None
+    latest_overall_os_list: Optional[List[dict]] = None
 
     log.info("Processed:")
     for vt, img in items:
@@ -426,15 +442,15 @@ def main(argv: List[str]) -> int:
         rel_path = Path(rel)
         rel_dir = str(rel_path.parent)
 
-        json_rel = rel[:-len(".img.xz")] + ".json"
-        json_path = cfg.json_dir / json_rel
+        manifest_rel = rel[:-len(".img.xz")] + MANIFEST_EXT
+        manifest_path = cfg.json_dir / manifest_rel
 
-        ensure_json_correct(cfg, img, json_path, rel, rel_dir, chown_ids)
+        ensure_manifest_correct(cfg, img, manifest_path, rel, rel_dir, chown_ids)
 
-        # Load JSON once here so we can log release_date and (if needed) use it for os-list aggregation.
-        data = load_json_safe(json_path)
+        # Load manifest once here so we can log release_date and (if needed) use it for os-list aggregation.
+        data = load_json_safe(manifest_path)
         if data is None:
-            die(f"Failed to parse JSON after validation: {json_path}", 2)
+            die(f"Failed to parse manifest JSON after validation: {manifest_path}", 2)
 
         _, release_date = extract_os0_fields(data)
         rd = release_date or ""
@@ -449,51 +465,57 @@ def main(argv: List[str]) -> int:
         if rel_dir != ".":
             continue
 
+        # Capture latest overall top-level once, since items are sorted newest-first.
+        if latest_overall_manifest is None:
+            os_list = extract_os_list(data)
+            if os_list is None:
+                die(f"Missing/invalid os_list in {manifest_path}", 2)
+            latest_overall_manifest = manifest_path
+            latest_overall_os_list = os_list
+
         # Capture latest Bookworm/Trixie once, since items are sorted newest-first.
-        if latest_trixie_json is None and vt_ge(vt, TRIXIE_CUTOFF):
-            latest_trixie_json = json_path
-        if latest_bookworm_json is None and not vt_ge(vt, TRIXIE_CUTOFF):
-            latest_bookworm_json = json_path
+        if latest_trixie_manifest is None and vt_ge(vt, TRIXIE_CUTOFF):
+            latest_trixie_manifest = manifest_path
+        if latest_bookworm_manifest is None and not vt_ge(vt, TRIXIE_CUTOFF):
+            latest_bookworm_manifest = manifest_path
 
-        # os-list aggregation: latest per (major, minor)
-        if len(vt) < 2:
-            continue
-        minor_key = (vt[0], vt[1])
-        if minor_key in seen_minors:
-            continue
-
-        os_list = extract_os_list(data)
-        if os_list is None:
-            die(f"Missing/invalid os_list in {json_path}", 2)
-
-        picked_os_lists.append(os_list)
-        seen_minors.add(minor_key)
-
-    combined: List[dict] = []
-    for os_list in picked_os_lists:
-        combined.extend(os_list)
-
-    if not combined:
+    if not latest_overall_os_list:
         die("No os_list entries collected (top-level images only); cannot write rpi-imager-os-list.json", 2)
 
     out_path = cfg.json_dir / "rpi-imager-os-list.json"
-    atomic_write_json(out_path, {"os_list": combined}, chown_ids)
-    log.info("Wrote: %s with %d os-list entries", out_path, len(combined))
+    atomic_write_json(out_path, {"os_list": latest_overall_os_list}, chown_ids)
+    log.info("Wrote: %s with %d os-list entries", out_path, len(latest_overall_os_list))
 
-    # Create generic symlinks in the images directory (web-visible), per request.
-    #   allstar3-arm64-latest-trixie.json    -> <latest trixie json>
-    #   allstar3-arm64-latest-bookworm.json  -> <latest bookworm json>
+    # Create/replace generic symlinks in the images directory (web-visible), per request:
+    #   latest-trixie.rpi-imager-manifest   -> <latest trixie manifest>
+    #   latest-bookworm.rpi-imager-manifest -> <latest bookworm manifest>
+    #   latest.json                         -> <latest overall manifest>
     link_dir = cfg.image_root
 
-    if latest_trixie_json is not None:
-        ensure_symlink(link_dir, "allstar3-arm64-latest-trixie.json", latest_trixie_json, chown_ids)
-    else:
-        log.warning("No top-level Trixie image found (>= %s); not creating latest-trixie symlink", ".".join(map(str, TRIXIE_CUTOFF)))
+    # Remove old names if present (so the directory doesn't accumulate stale aliases).
+    remove_path_if_exists(link_dir / "allstar3-arm64-latest-trixie.json")
+    remove_path_if_exists(link_dir / "allstar3-arm64-latest-bookworm.json")
 
-    if latest_bookworm_json is not None:
-        ensure_symlink(link_dir, "allstar3-arm64-latest-bookworm.json", latest_bookworm_json, chown_ids)
+    if latest_trixie_manifest is not None:
+        ensure_symlink(link_dir, f"latest-trixie{MANIFEST_EXT}", latest_trixie_manifest, chown_ids)
     else:
-        log.warning("No top-level Bookworm image found (< %s); not creating latest-bookworm symlink", ".".join(map(str, TRIXIE_CUTOFF)))
+        log.warning(
+            "No top-level Trixie image found (>= %s); not creating latest-trixie symlink",
+            ".".join(map(str, TRIXIE_CUTOFF)),
+        )
+
+    if latest_bookworm_manifest is not None:
+        ensure_symlink(link_dir, f"latest-bookworm{MANIFEST_EXT}", latest_bookworm_manifest, chown_ids)
+    else:
+        log.warning(
+            "No top-level Bookworm image found (< %s); not creating latest-bookworm symlink",
+            ".".join(map(str, TRIXIE_CUTOFF)),
+        )
+
+    if latest_overall_manifest is not None:
+        ensure_symlink(link_dir, "latest.json", latest_overall_manifest, chown_ids)
+    else:
+        log.warning("No top-level images found; not creating latest.json symlink")
 
     return 0
 
