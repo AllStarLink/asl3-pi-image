@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+import argparse
+import hashlib
+import json
+import lzma
+import os
+import re
+import sys
+from datetime import datetime, date
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import grp
+import pwd
+
+
+SUPPORTED_DEVICES = ["pi5-64bit", "pi4-64bit", "pi3-64bit"]
+ICON_URL = "https://www.allstarlink.org/assets/images/allstar-logo-small.png"
+BASE_URL = "https://repo.allstarlink.org/images/pi"
+
+IMAGER_SETTINGS = {
+    "latest_version": "2.0.0",
+    "url": "https://www.raspberrypi.com/software/",
+    "devices": [
+        {
+            "name": "Raspberry Pi 5",
+            "tags": ["pi5-64bit"],
+            "default": True,
+            "icon": "https://downloads.raspberrypi.com/imager/icons/RPi_5.png",
+            "description": "Raspberry Pi 5, 500 / 500+, and Compute Module 5",
+            "matching_type": "exclusive",
+        },
+        {
+            "name": "Raspberry Pi 4",
+            "tags": ["pi4-64bit"],
+            "icon": "https://downloads.raspberrypi.com/imager/icons/RPi_4.png",
+            "description": "Raspberry Pi 4 Model B, 400, and Compute Module 4 / 4S",
+            "matching_type": "inclusive",
+        },
+        {
+            "name": "Raspberry Pi 3",
+            "tags": ["pi3-64bit"],
+            "icon": "https://downloads.raspberrypi.com/imager/icons/RPi_3.png",
+            "description": "Raspberry Pi 3 Model A+ / B / B+ and Compute Module 3 / 3+",
+            "matching_type": "inclusive",
+        },
+        {
+            "name": "Raspberry Pi Zero 2 W",
+            "tags": ["pi3-64bit"],
+            "icon": "https://downloads.raspberrypi.com/imager/icons/RPi_Zero_2_W.png",
+            "description": "Raspberry Pi Zero 2 W",
+            "matching_type": "inclusive",
+        },
+    ],
+}
+
+_VERSION_RE = re.compile(r"^allstar3-arm64-(\d+(?:\.\d+)*)\.img\.xz$")
+
+
+def www_data_ids() -> Tuple[int, int]:
+    try:
+        pw = pwd.getpwnam("aws-pi-builder")
+    except KeyError as e:
+        raise SystemExit("ERROR: user 'aws-pi-builder' not found on this system") from e
+
+    uid = pw.pw_uid
+    gid = pw.pw_gid
+    try:
+        gid = grp.getgrnam("aws-pi-builder").gr_gid
+    except KeyError:
+        pass
+    return (uid, gid)
+
+
+def require_root_or_www_data_for_writes() -> Tuple[Optional[Tuple[int, int]], str]:
+    """
+    Enforce that the current effective user is root or aws-pi-builder.
+
+    Returns (chown_ids, who):
+      - chown_ids is (www_uid, www_gid) if running as root (so we can chown outputs)
+      - chown_ids is None if running as aws-pi-builder (already correct ownership)
+      - who is a string used for error messages
+    """
+    euid = os.geteuid()
+    www_uid, www_gid = www_data_ids()
+
+    if euid == 0:
+        return (www_uid, www_gid), "root"
+    if euid == www_uid:
+        return None, "aws-pi-builder"
+
+    try:
+        who = pwd.getpwuid(euid).pw_name
+    except KeyError:
+        who = str(euid)
+    raise SystemExit(f"ERROR: must run as root or aws-pi-builder to write repo manifest files (current euid={who})")
+
+
+def mkdir_parents_with_optional_chown(dir_path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
+    if not dir_path:
+        return
+    if dir_path.exists():
+        return
+
+    # Create parent chain and chown only those dirs we create (when running as root).
+    chain: List[Path] = []
+    cur = dir_path
+    while not cur.exists():
+        chain.append(cur)
+        parent = cur.parent
+        if parent == cur:
+            break
+        cur = parent
+
+    for d in reversed(chain):
+        d.mkdir(exist_ok=True)
+        if chown_ids and os.geteuid() == 0:
+            uid, gid = chown_ids
+            try:
+                os.chown(d, uid, gid)
+            except PermissionError:
+                # Shouldn't happen as root, but don't crash over it.
+                pass
+
+
+def chown_path_if_root(path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
+    if not chown_ids or os.geteuid() != 0:
+        return
+    uid, gid = chown_ids
+    try:
+        os.chown(path, uid, gid)
+    except PermissionError:
+        pass
+
+
+def parse_version_from_filename(path: str) -> str:
+    base = os.path.basename(path)
+    m = _VERSION_RE.match(base)
+    if not m:
+        raise ValueError(
+            f"Cannot parse version from filename '{base}'. "
+            "Expected: allstar3-arm64-<version>.img.xz"
+        )
+    return m.group(1)
+
+
+def version_tuple(v: str) -> Tuple[int, ...]:
+    parts = v.split(".")
+    out: List[int] = []
+    for p in parts:
+        if not p.isdigit():
+            raise ValueError(f"Invalid version component '{p}' in version '{v}'")
+        out.append(int(p))
+    return tuple(out)
+
+
+def is_lt(v: str, cutoff: str) -> bool:
+    a = list(version_tuple(v))
+    b = list(version_tuple(cutoff))
+    n = max(len(a), len(b))
+    a += [0] * (n - len(a))
+    b += [0] * (n - len(b))
+    return tuple(a) < tuple(b)
+
+
+def today_iso() -> str:
+    return date.today().isoformat()
+
+
+def file_creation_date_iso(path: str) -> str:
+    """
+    Returns the file's creation date (YYYY-MM-DD) when available.
+
+    Notes:
+    - On macOS, st_birthtime is the true creation time.
+    - On many Linux filesystems, creation time may be unavailable; in that case
+      we fall back to st_mtime (last modification time).
+    """
+    st = os.stat(path)
+    birth = getattr(st, "st_birthtime", None)
+    ts = birth if isinstance(birth, (int, float)) and birth and birth > 0 else st.st_mtime
+    return datetime.fromtimestamp(ts).date().isoformat()
+
+
+def sha256_file(path: str, chunk_size: int = 1024 * 1024) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def sha256_and_size_decompressed_xz(path: str, chunk_size: int = 1024 * 1024) -> Tuple[str, int]:
+    h = hashlib.sha256()
+    total = 0
+    with lzma.open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            total += len(chunk)
+            h.update(chunk)
+    return (h.hexdigest(), total)
+
+
+def build_url(filename: str, location: Optional[str]) -> str:
+    if location:
+        location = location.strip("/")
+        return f"{BASE_URL}/{location}/{filename}"
+    return f"{BASE_URL}/{filename}"
+
+
+def write_json(obj: dict, output: str, chown_ids: Optional[Tuple[int, int]]) -> None:
+    if output == "-" or output == "":
+        json.dump(obj, sys.stdout, indent=4)
+        sys.stdout.write("\n")
+        return
+
+    out_path = Path(output)
+    if out_path.parent and str(out_path.parent) not in (".", ""):
+        mkdir_parents_with_optional_chown(out_path.parent, chown_ids)
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=4)
+        f.write("\n")
+
+    chown_path_if_root(out_path, chown_ids)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="Generate a Raspberry Pi Imager os_list manifest entry for an AllStarLink .img.xz",
+    )
+    ap.add_argument("img_xz", help="Path to allstar3-arm64-<version>.img.xz")
+    ap.add_argument(
+        "--release-date",
+        dest="release_date",
+        default=None,
+        help="Release date in YYYY-MM-DD (default: creation date of the .img.xz file)",
+    )
+    ap.add_argument(
+        "--location",
+        default=None,
+        help="Optional subdirectory under https://repo.allstarlink.org/images/pi/",
+    )
+    ap.add_argument(
+        "--output",
+        default="-",
+        help="Write manifest JSON to this path (default: - for stdout)",
+    )
+
+    args = ap.parse_args()
+
+    img_path = args.img_xz
+    if not os.path.isfile(img_path):
+        raise SystemExit(f"Not a file: {img_path}")
+
+    chown_ids: Optional[Tuple[int, int]] = None
+    if args.output not in ("", "-"):
+        chown_ids, _ = require_root_or_www_data_for_writes()
+
+    filename = os.path.basename(img_path)
+    version = parse_version_from_filename(img_path)
+
+    os_name = "Bookworm" if is_lt(version, "3.1.0") else "Trixie"
+    release_date = args.release_date or file_creation_date_iso(img_path)
+
+    url = build_url(filename, args.location)
+
+    image_download_size = os.stat(img_path).st_size
+    image_download_sha256 = sha256_file(img_path)
+
+    extract_sha256, extract_size = sha256_and_size_decompressed_xz(img_path)
+
+    obj = {
+        "imager": IMAGER_SETTINGS,
+        "os_list": [
+            {
+                "name": f"AllStarLink {version} ({os_name})",
+                "description": f"AllStarLink ASL3 Raspberry Pi Appliance ({version})",
+                "website": "https://www.allstarlink.org",
+                "icon": ICON_URL,
+                "url": url,
+                "extract_size": int(extract_size),
+                "extract_sha256": extract_sha256,
+                "image_download_size": int(image_download_size),
+                "image_download_sha256": image_download_sha256,
+                "release_date": release_date,
+                "devices": SUPPORTED_DEVICES,
+                "init_format": "systemd",
+            }
+        ],
+    }
+
+    write_json(obj, args.output, chown_ids)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -92,3 +92,7 @@ SSH_VARS="-i id_ed25519 -o StrictHostKeyChecking=accept-new"
 scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz aws-pi-builder@aws-east1a-web1.allstarlink.org:${REPO_PATH}
 sha256sum allstar3-arm64-${VER}.img.xz > allstar3-arm64-${VER}.img.xz.sha256
 scp ${SSH_VARS} allstar3-arm64-${VER}.img.xz.sha256 aws-pi-builder@aws-east1a-web1.allstarlink.org:${REPO_PATH}
+
+## Update Raspberry Pi Imager ".json" files
+ssh ${SSH_VARS} aws-pi-builder@aws-east1a-web1.allstarlink.org /usr/bin/repo_rpi_imager_update
+

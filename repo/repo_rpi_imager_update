@@ -1,0 +1,524 @@
+#!/usr/bin/env python3
+import argparse
+import grp
+import json
+import logging
+import os
+import pwd
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional, Tuple, List
+from urllib.parse import urlparse
+
+RX = re.compile(r"^allstar3-arm64-([0-9]+(?:\.[0-9]+)*)\.img\.xz$")
+DATE_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# Version cutoff used elsewhere (repo_create_imager_json) to label OS:
+#   < 3.1.0 => Bookworm
+#  >= 3.1.0 => Trixie
+TRIXIE_CUTOFF: Tuple[int, ...] = (3, 1, 0)
+
+# Per-image manifest extension (JSON content, different filename extension).
+MANIFEST_EXT = ".rpi-imager-manifest"
+
+log = logging.getLogger("repo_rpi_imager_update")
+
+
+def die(msg: str, code: int = 1) -> None:
+    log.error("%s", msg)
+    raise SystemExit(code)
+
+
+def www_data_ids() -> Tuple[int, int]:
+    try:
+        pw = pwd.getpwnam("aws-pi-builder")
+    except KeyError as e:
+        raise SystemExit("ERROR: user 'aws-pi-builder' not found on this system") from e
+
+    uid = pw.pw_uid
+    gid = pw.pw_gid
+    try:
+        gid = grp.getgrnam("aws-pi-builder").gr_gid
+    except KeyError:
+        pass
+    return (uid, gid)
+
+
+def require_root_or_www_data_for_writes() -> Tuple[Optional[Tuple[int, int]], str]:
+    """
+    Enforce that the current effective user is root or aws-pi-builder.
+
+    Returns (chown_ids, who):
+      - chown_ids is (www_uid, www_gid) if running as root (so we can chown outputs)
+      - chown_ids is None if running as aws-pi-builder (already correct ownership)
+      - who is a string used for error messages
+    """
+    euid = os.geteuid()
+    www_uid, www_gid = www_data_ids()
+
+    if euid == 0:
+        return (www_uid, www_gid), "root"
+    if euid == www_uid:
+        return None, "aws-pi-builder"
+
+    try:
+        who = pwd.getpwuid(euid).pw_name
+    except KeyError:
+        who = str(euid)
+    raise SystemExit(f"ERROR: must run as root or aws-pi-builder to write repo manifest files (current euid={who})")
+
+
+def mkdir_parents_with_optional_chown(dir_path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
+    if not dir_path:
+        return
+    if dir_path.exists():
+        return
+
+    chain: List[Path] = []
+    cur = dir_path
+    while not cur.exists():
+        chain.append(cur)
+        parent = cur.parent
+        if parent == cur:
+            break
+        cur = parent
+
+    for d in reversed(chain):
+        d.mkdir(exist_ok=True)
+        if chown_ids and os.geteuid() == 0:
+            uid, gid = chown_ids
+            try:
+                os.chown(d, uid, gid)
+            except PermissionError:
+                pass
+
+
+def chown_path_if_root(path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
+    if not chown_ids or os.geteuid() != 0:
+        return
+    uid, gid = chown_ids
+    try:
+        os.chown(path, uid, gid)
+    except PermissionError:
+        pass
+
+
+def lchown_path_if_root(path: Path, chown_ids: Optional[Tuple[int, int]]) -> None:
+    """
+    Like chown_path_if_root, but does NOT follow symlinks.
+    """
+    if not chown_ids or os.geteuid() != 0:
+        return
+    uid, gid = chown_ids
+    try:
+        os.lchown(path, uid, gid)
+    except (AttributeError, PermissionError, FileNotFoundError):
+        pass
+
+
+@dataclass(frozen=True)
+class Config:
+    root_dir: Path
+    image_subdir: str
+    image_root: Path
+    json_dir: Path
+    create_cmd: str
+
+
+def normalize_image_subdir(s: str) -> str:
+    s = (s or "").strip()
+    if not s:
+        s = "/images/pi"
+    if not s.startswith("/"):
+        s = "/" + s
+    return s.rstrip("/")
+
+
+def version_tuple(p: Path) -> Optional[Tuple[int, ...]]:
+    m = RX.match(p.name)
+    if not m:
+        return None
+    return tuple(int(x) for x in m.group(1).split("."))
+
+
+def expected_url_suffix(image_subdir: str, rel_img: str) -> str:
+    return f"{image_subdir}/{rel_img}".replace("//", "/")
+
+
+def load_json_safe(path: Path) -> Optional[Any]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def extract_os0_fields(data: Any) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Return (url_path, release_date) extracted from os_list[0].
+      - url_path is parsed.path from os_list[0].url
+      - release_date is os_list[0].release_date if it matches YYYY-MM-DD
+    Returns (None, None) if data doesn't match expected schema enough.
+    """
+    if not isinstance(data, dict):
+        return (None, None)
+
+    os_list = data.get("os_list")
+    if not isinstance(os_list, list) or not os_list:
+        return (None, None)
+
+    first = os_list[0]
+    if not isinstance(first, dict):
+        return (None, None)
+
+    url_path: Optional[str] = None
+    url = first.get("url")
+    if isinstance(url, str) and url:
+        url_path = urlparse(url).path
+
+    rd: Optional[str] = None
+    release_date = first.get("release_date")
+    if isinstance(release_date, str) and DATE_RX.match(release_date):
+        rd = release_date
+
+    return (url_path, rd)
+
+
+def extract_os_list(data: Any) -> Optional[List[dict]]:
+    """
+    Return the os_list array if it looks like a list of dicts (and non-empty).
+    """
+    if not isinstance(data, dict):
+        return None
+    os_list = data.get("os_list")
+    if not isinstance(os_list, list) or not os_list:
+        return None
+    if not all(isinstance(x, dict) for x in os_list):
+        return None
+    return os_list  # type: ignore[return-value]
+
+
+def vt_ge(a: Tuple[int, ...], b: Tuple[int, ...]) -> bool:
+    aa = list(a)
+    bb = list(b)
+    n = max(len(aa), len(bb))
+    aa += [0] * (n - len(aa))
+    bb += [0] * (n - len(bb))
+    return tuple(aa) >= tuple(bb)
+
+
+def run_generator(
+    cfg: Config,
+    img: Path,
+    out_path: Path,
+    rel_dir: str,
+    release_date: Optional[str],
+    chown_ids: Optional[Tuple[int, int]],
+) -> None:
+    mkdir_parents_with_optional_chown(out_path.parent, chown_ids)
+
+    cmd = [cfg.create_cmd]
+    if release_date:
+        cmd += ["--release-date", release_date]
+    if rel_dir and rel_dir != ".":
+        cmd += ["--location", rel_dir]
+    cmd += ["--output", str(out_path), str(img)]
+
+    try:
+        subprocess.run(cmd, check=True)
+    except FileNotFoundError:
+        die(f"Missing generator: {cfg.create_cmd} (use --create-json-cmd /full/path/to/repo_create_imager_json)")
+    except subprocess.CalledProcessError as e:
+        die(f"Generator failed (exit={e.returncode}) for {img}", e.returncode)
+
+    if not out_path.exists():
+        die(f"Manifest was not created: {out_path}")
+
+    # If update is running as root, enforce ownership regardless of generator behavior.
+    chown_path_if_root(out_path, chown_ids)
+
+
+def ensure_manifest_correct(
+    cfg: Config,
+    img: Path,
+    manifest_path: Path,
+    rel_img: str,
+    rel_dir: str,
+    chown_ids: Optional[Tuple[int, int]],
+) -> None:
+    """
+    If manifest missing -> create.
+    If manifest exists but URL-path suffix doesn't match expected -> recreate/overwrite,
+    preserving existing os_list[0].release_date when available.
+    If manifest exists but is malformed (missing url) -> recreate (no release_date preserved unless present).
+    Then validate strictly.
+    """
+    exp = expected_url_suffix(cfg.image_subdir, rel_img)
+
+    need_regen = not manifest_path.exists()
+    preserve_release_date: Optional[str] = None
+
+    if manifest_path.exists():
+        data = load_json_safe(manifest_path)
+        url_path, rd = extract_os0_fields(data) if data is not None else (None, None)
+
+        if url_path is None:
+            need_regen = True
+            preserve_release_date = rd
+        elif not url_path.endswith(exp):
+            need_regen = True
+            preserve_release_date = rd
+
+    if need_regen:
+        if manifest_path.exists():
+            log.info("Recreating manifest: %s", manifest_path)
+        else:
+            log.info("Creating missing manifest: %s", manifest_path)
+
+        if preserve_release_date:
+            log.info("  preserving release_date: %s", preserve_release_date)
+
+        run_generator(cfg, img, manifest_path, rel_dir, preserve_release_date, chown_ids)
+
+    data = load_json_safe(manifest_path)
+    if data is None:
+        die(f"Failed to parse manifest JSON after creation: {manifest_path}", 2)
+
+    url_path, _ = extract_os0_fields(data)
+    if not url_path:
+        die(f"Missing/invalid os_list[0].url in {manifest_path}", 2)
+
+    if not url_path.endswith(exp):
+        log.error("url mismatch in %s", manifest_path)
+        log.error("  expected URL path to end with: %s", exp)
+        log.error("  found URL path: %s", url_path)
+        raise SystemExit(3)
+
+
+def atomic_write_json(path: Path, obj: Any, chown_ids: Optional[Tuple[int, int]]) -> None:
+    mkdir_parents_with_optional_chown(path.parent, chown_ids)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    chown_path_if_root(path, chown_ids)
+
+
+def ensure_symlink(
+    link_dir: Path,
+    link_name: str,
+    target_path: Path,
+    chown_ids: Optional[Tuple[int, int]],
+) -> None:
+    """
+    Roughly equivalent to: ln -f -s <target> <link_name>
+    but writes the link inside link_dir, using a relative target when possible.
+    """
+    mkdir_parents_with_optional_chown(link_dir, chown_ids)
+
+    link = link_dir / link_name
+    target_rel = os.path.relpath(str(target_path), start=str(link_dir))
+
+    # Idempotent: if already correct, do nothing.
+    if link.is_symlink():
+        try:
+            if os.readlink(link) == target_rel:
+                return
+        except OSError:
+            pass
+
+    if link.exists() or link.is_symlink():
+        # If it's a file or stale symlink, replace it (like ln -f).
+        link.unlink()
+
+    link.symlink_to(target_rel)
+    lchown_path_if_root(link, chown_ids)
+    log.info("Symlink: %s -> %s", link, target_rel)
+
+
+def remove_path_if_exists(path: Path) -> None:
+    try:
+        if path.is_symlink() or path.exists():
+            path.unlink()
+    except FileNotFoundError:
+        pass
+    except IsADirectoryError:
+        pass
+
+
+def parse_args(argv: List[str]) -> Config:
+    p = argparse.ArgumentParser(
+        prog=Path(sys.argv[0]).name,
+        description=(
+            "Ensure per-image Raspberry Pi Imager manifest files exist (JSON content with .rpi-imager-manifest extension) "
+            "and generate a top-level rpi-imager-os-list.json."
+        ),
+    )
+    p.add_argument(
+        "--root-dir",
+        default="/var/www/html",
+        help="Base web root directory (default: %(default)s).",
+    )
+    p.add_argument(
+        "--image-subdir",
+        default="/images/pi",
+        help="Subdirectory under root-dir that contains images (default: %(default)s).",
+    )
+    p.add_argument(
+        "--json-dir",
+        default="",
+        help="Directory to write/read manifest files (default: IMAGE_ROOT).",
+    )
+    p.add_argument(
+        "--create-json-cmd",
+        default="repo_create_imager_json",
+        help="Generator command to create manifest files (default: %(default)s).",
+    )
+    a = p.parse_args(argv)
+
+    root_dir = Path(a.root_dir).resolve()
+    image_subdir = normalize_image_subdir(a.image_subdir)
+    image_root = (root_dir / image_subdir.lstrip("/")).resolve()
+    json_dir = Path(a.json_dir).resolve() if a.json_dir else image_root
+
+    return Config(
+        root_dir=root_dir,
+        image_subdir=image_subdir,
+        image_root=image_root,
+        json_dir=json_dir,
+        create_cmd=a.create_json_cmd,
+    )
+
+
+def main(argv: List[str]) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    # This script always writes manifests (per-image and the combined os-list),
+    # so enforce privileges unconditionally.
+    chown_ids, who = require_root_or_www_data_for_writes()
+    log.info("Running as %s (writes enabled)", who)
+
+    cfg = parse_args(argv)
+
+    if not cfg.root_dir.is_dir():
+        die(f"root-dir not found: {cfg.root_dir}")
+    if not cfg.image_root.is_dir():
+        die(f"Image directory not found: {cfg.image_root} (root-dir + image-subdir)")
+
+    mkdir_parents_with_optional_chown(cfg.json_dir, chown_ids)
+
+    items: List[Tuple[Tuple[int, ...], Path]] = []
+    skipped = 0
+    for img in cfg.image_root.rglob("*.img.xz"):
+        vt = version_tuple(img)
+        if vt is None:
+            skipped += 1
+            continue
+        items.append((vt, img))
+
+    if not items:
+        die(f"No usable images found under: {cfg.image_root}")
+
+    items.sort(key=lambda t: t[0], reverse=True)
+
+    log.info("Image root: %s", cfg.image_root)
+    if cfg.json_dir != cfg.image_root:
+        log.info("manifest root: %s", cfg.json_dir)
+    if skipped > 0:
+        log.info("Skipped due to name mismatch: %d", skipped)
+
+    # Track latest top-level Bookworm/Trixie manifest paths (based on TRIXIE_CUTOFF).
+    latest_bookworm_manifest: Optional[Path] = None
+    latest_trixie_manifest: Optional[Path] = None
+
+    # Track latest overall (top-level) manifest + os_list for rpi-imager-os-list.json.
+    latest_overall_manifest: Optional[Path] = None
+    latest_overall_os_list: Optional[List[dict]] = None
+
+    log.info("Processed:")
+    for vt, img in items:
+        rel = img.relative_to(cfg.image_root).as_posix()
+        rel_path = Path(rel)
+        rel_dir = str(rel_path.parent)
+
+        manifest_rel = rel[:-len(".img.xz")] + MANIFEST_EXT
+        manifest_path = cfg.json_dir / manifest_rel
+
+        ensure_manifest_correct(cfg, img, manifest_path, rel, rel_dir, chown_ids)
+
+        # Load manifest once here so we can log release_date and (if needed) use it for os-list aggregation.
+        data = load_json_safe(manifest_path)
+        if data is None:
+            die(f"Failed to parse manifest JSON after validation: {manifest_path}", 2)
+
+        _, release_date = extract_os0_fields(data)
+        rd = release_date or ""
+
+        ver = ".".join(map(str, vt))
+        subdir = "" if rel_dir == "." else rel_dir
+
+        # Note: VER, DATE, and SUBDIR are fixed-width for alignment
+        log.info("  VER=%-6.6s RELDATE=%-10.10s SUBDIR=%-7.7s IMG=%s", ver, rd, subdir, img)
+
+        # Everything below is only for top-level images.
+        if rel_dir != ".":
+            continue
+
+        # Capture latest overall top-level once, since items are sorted newest-first.
+        if latest_overall_manifest is None:
+            os_list = extract_os_list(data)
+            if os_list is None:
+                die(f"Missing/invalid os_list in {manifest_path}", 2)
+            latest_overall_manifest = manifest_path
+            latest_overall_os_list = os_list
+
+        # Capture latest Bookworm/Trixie once, since items are sorted newest-first.
+        if latest_trixie_manifest is None and vt_ge(vt, TRIXIE_CUTOFF):
+            latest_trixie_manifest = manifest_path
+        if latest_bookworm_manifest is None and not vt_ge(vt, TRIXIE_CUTOFF):
+            latest_bookworm_manifest = manifest_path
+
+    if not latest_overall_os_list:
+        die("No os_list entries collected (top-level images only); cannot write rpi-imager-os-list.json", 2)
+
+    out_path = cfg.json_dir / "rpi-imager-os-list.json"
+    atomic_write_json(out_path, {"os_list": latest_overall_os_list}, chown_ids)
+    log.info("Wrote: %s with %d os-list entries", out_path, len(latest_overall_os_list))
+
+    # Create/replace generic symlinks in the images directory (web-visible), per request:
+    #   latest-trixie.rpi-imager-manifest   -> <latest trixie manifest>
+    #   latest-bookworm.rpi-imager-manifest -> <latest bookworm manifest>
+    #   latest.json                         -> <latest overall manifest>
+    link_dir = cfg.image_root
+
+    # Remove old names if present (so the directory doesn't accumulate stale aliases).
+    remove_path_if_exists(link_dir / "allstar3-arm64-latest-trixie.json")
+    remove_path_if_exists(link_dir / "allstar3-arm64-latest-bookworm.json")
+
+    if latest_trixie_manifest is not None:
+        ensure_symlink(link_dir, f"latest-trixie{MANIFEST_EXT}", latest_trixie_manifest, chown_ids)
+    else:
+        log.warning(
+            "No top-level Trixie image found (>= %s); not creating latest-trixie symlink",
+            ".".join(map(str, TRIXIE_CUTOFF)),
+        )
+
+    if latest_bookworm_manifest is not None:
+        ensure_symlink(link_dir, f"latest-bookworm{MANIFEST_EXT}", latest_bookworm_manifest, chown_ids)
+    else:
+        log.warning(
+            "No top-level Bookworm image found (< %s); not creating latest-bookworm symlink",
+            ".".join(map(str, TRIXIE_CUTOFF)),
+        )
+
+    if latest_overall_manifest is not None:
+        ensure_symlink(link_dir, "latest.json", latest_overall_manifest, chown_ids)
+    else:
+        log.warning("No top-level images found; not creating latest.json symlink")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
