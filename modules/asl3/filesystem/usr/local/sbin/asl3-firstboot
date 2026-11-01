@@ -5,18 +5,46 @@ if [ -e /asl3-first-boot-needed ]; then
 
 	THISHOST=$(hostnamectl hostname)
 
-	# Regenerate the snakeoil certificate
-	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-		-keyout /etc/ssl/private/ssl-cert-snakeoil.key \
-		-out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj \
-		"/CN=${THISHOST}.local"
+	# Regenerate the snakeoil certificate for this host. Macs, iPhones and
+	# iPads trust a self-signed certificate only with the names in a
+	# subjectAltName, extendedKeyUsage serverAuth and at most 825 days of
+	# validity, and Safari needs that trust for the WebSockets asl-web-ui
+	# and Allmon3 use (AllStarLink/asl-web-ui#46). The image's certificate
+	# is removed first, so none of its names carry over. asl3-appliance's
+	# asl3-self-signed-cert makes it when installed (it also renews it on
+	# upgrades); otherwise openssl makes the same kind directly.
+	SNAKEOIL_CERT=/etc/ssl/certs/ssl-cert-snakeoil.pem
+	SNAKEOIL_KEY=/etc/ssl/private/ssl-cert-snakeoil.key
+	rm -f "${SNAKEOIL_CERT}" "${SNAKEOIL_KEY}"
+	if ! { [ -x /usr/sbin/asl3-self-signed-cert ] && /usr/sbin/asl3-self-signed-cert; }; then
+		SHORTHOST=${THISHOST%%.*}
+		(umask 077; openssl req -x509 -nodes -sha256 -days 825 -newkey rsa:2048 \
+			-keyout "${SNAKEOIL_KEY}" -out "${SNAKEOIL_CERT}" \
+			-subj "/CN=${SHORTHOST}.local" \
+			-addext "subjectAltName=DNS:${SHORTHOST}.local,DNS:${SHORTHOST}" \
+			-addext "basicConstraints=critical,CA:FALSE" \
+			-addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+			-addext "extendedKeyUsage=serverAuth")
+		chgrp ssl-cert "${SNAKEOIL_KEY}" 2>/dev/null || true
+		chmod 640 "${SNAKEOIL_KEY}"
+		chmod 644 "${SNAKEOIL_CERT}"
+	fi
 	systemctl restart apache2
 
-	# Regenerate the Cockpit certificate
-	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-		-keyout /etc/cockpit/ws-certs.d/0-self-signed.key \
-		-out /etc/cockpit/ws-certs.d/0-self-signed.cert -subj \
-		"/CN=${THISHOST}.local"
+	# Cockpit uses a copy of the same certificate, so that trusting it once
+	# covers both. asl3-self-signed-cert makes the copy itself; this makes
+	# it when openssl made the certificate. Cockpit uses the last *.cert in
+	# ws-certs.d, so the copy wins over Cockpit's own 0-self-signed.cert,
+	# which is removed here because the image's one names the build host.
+	COCKPIT_CERTS=/etc/cockpit/ws-certs.d
+	rm -f "${COCKPIT_CERTS}/0-self-signed.cert" "${COCKPIT_CERTS}/0-self-signed.key" \
+		"${COCKPIT_CERTS}/0-self-signed-ca.pem"
+	if [ -d /etc/cockpit ] && ! cmp -s "${SNAKEOIL_CERT}" "${COCKPIT_CERTS}/50-asl3-self-signed.cert"; then
+		mkdir -p "${COCKPIT_CERTS}"
+		install -m 600 "${SNAKEOIL_KEY}" "${COCKPIT_CERTS}/50-asl3-self-signed.key"
+		install -m 644 "${SNAKEOIL_CERT}" "${COCKPIT_CERTS}/50-asl3-self-signed.cert"
+	fi
+	systemctl try-restart cockpit.service
 
 	# Configure manager for Allmon
 	MGR_PWD=$(openssl rand -hex 8)
