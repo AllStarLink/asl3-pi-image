@@ -76,13 +76,11 @@ EOF
 
 ## For GPIO accessibility, enable serial and disable bluetooth
 cat - >> /boot/firmware/config.txt <<EOF
-# ------------ Universal serial port on pins 8 / 10 -------------
-[all]                     # applies to every Raspberry Pi model
-enable_uart=1             # guarantees /dev/serial0 is created
-dtoverlay=disable-bt      # kills the on-board BT radio
-#  (on Pi 5 this is transparently remapped to the
-#   Pi-5-specific overlay “disable-bt-pi5”)
-# ---------------------------------------------------------------
-
+# Universal serial port on pins 8 / 10
+[all]
+# guarantees /dev/serial0 is created
+enable_uart=1
+# kills the on-board BT radio
+dtoverlay=disable-bt
 EOF
 
